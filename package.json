@@ -1,0 +1,5 @@
+{
+    "name": "flowforge",
+    "private": true,
+    "workspaces": ["apps/*", "packages/*"]
+}
