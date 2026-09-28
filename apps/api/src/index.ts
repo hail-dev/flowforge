@@ -1,18 +1,39 @@
-import express from "express";
+  import express from "express";
+  import { pool } from "./db";
+  import { redis } from "./redis";
 
-const app = express();
-const port = Number(process.env.API_PORT ?? 3001);
+  const app = express();
+  const port = Number(process.env.API_PORT ?? 3001);
 
-app.use(express.json());
+  app.use(express.json());
 
-app.get("/health", (_req, res) => {
-    res.json({
-        status: "ok",
-        service: "flowforge-api",
-        time: new Date().toISOString(),
+  async function check(fn: () => Promise<unknown>, timeoutMs = 2000): Promise<"ok" | "down"> {
+    try {
+      await Promise.race([
+        fn(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
+      ]);
+      return "ok";
+    } catch {
+      return "down";
+    }
+  }
+
+  app.get("/health", async (_req, res) => {
+    const [postgres, redisStatus] = await Promise.all([
+      check(() => pool.query("select 1")),
+      check(() => redis.ping()),
+    ]);
+    const healthy = postgres === "ok" && redisStatus === "ok";
+
+    res.status(healthy ? 200 : 503).json({
+      status: healthy ? "ok" : "degraded",
+      service: "flowforge-api",
+      checks: { postgres, redis: redisStatus },
+      time: new Date().toISOString(),
     });
-});
+  });
 
-app.listen(port, () => {
+  app.listen(port, () => {
     console.log(`flowforge-api listening on http://localhost:${port}`);
-});
+  });
