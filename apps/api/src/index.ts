@@ -1,9 +1,10 @@
   import express from "express";
   import { pool } from "./db";
   import { redis } from "./redis";
+  import { env } from "./env";
 
   const app = express();
-  const port = Number(process.env.API_PORT ?? 3001);
+  const port = Number(env.API_PORT ?? 3001);
 
   app.use(express.json());
 
