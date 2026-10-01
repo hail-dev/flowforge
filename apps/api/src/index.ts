@@ -1,9 +1,19 @@
   import express from "express";
+  import { env } from "./env";
   import { pool } from "./db";
   import { redis } from "./redis";
-  import { env } from "./env";
+  import { authRouter } from "./auth/routes";
+  import { requireAuth, AuthedRequest } from "./auth/middleware";
 
   const app = express();
+  app.use(express.json());
+
+  app.use("/auth", authRouter);
+
+  app.get("/auth/me", requireAuth, (req: AuthedRequest, res) => {
+    res.json({ auth: req.auth });
+  });
+
   const port = Number(env.API_PORT ?? 3001);
 
   app.use(express.json());
