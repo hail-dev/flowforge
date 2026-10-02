@@ -4,15 +4,17 @@
   import { redis } from "./redis";
   import { authRouter } from "./auth/routes";
   import { requireAuth, AuthedRequest } from "./auth/middleware";
+  import { workflowsRouter } from "./workflows/routes";
 
   const app = express();
   app.use(express.json());
 
   app.use("/auth", authRouter);
-
   app.get("/auth/me", requireAuth, (req: AuthedRequest, res) => {
     res.json({ auth: req.auth });
   });
+
+  app.use("/workflows", workflowsRouter);
 
   const port = Number(env.API_PORT ?? 3001);
 
