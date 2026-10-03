@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
 import { create } from "node:domain";
+import { validateWorkflowDefinition } from "../dsl/validate";
 
 export const workflowsRouter = Router();
 workflowsRouter.use(requireAuth);
@@ -26,6 +27,10 @@ workflowsRouter.post("/", async (req: AuthedRequest, res) => {
     }
     const { name, definition } = parsed.data;
     const tenantId = req.auth!.tenantId;
+    const validation = validateWorkflowDefinition(definition);
+    if (!validation.valid) {
+        return res.status(400).json({ error: "Invalid workflow definition", details: validation.errors});
+    }
 
     const result = await pool.query(
         `INSERT INTO workflows (tenant_id, name, definition)
@@ -70,6 +75,12 @@ workflowsRouter.put("/:id", async (req: AuthedRequest, res) => {
     }
     const tenantId = req.auth!.tenantId;
     const {name, definition, isActive} = parsed.data;
+    if (definition !== undefined) {
+        const validation = validateWorkflowDefinition(definition);
+        if (!validation.valid) {
+            return res.status(400).json({ error: "Invalid workflow definition", details: validation.errors });
+        }
+    }
 
     if (name === undefined && definition === undefined && isActive === undefined) {
         return res.status(400).json({ error: "No fields to update" });
