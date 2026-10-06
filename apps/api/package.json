@@ -7,6 +7,7 @@
         "build": "tsc",
         "start": "node --env-file=../../.env dist/index.js",
         "typecheck": "tsc --noEmit",
+        "test": "vitest run",
         "migrate:up": "node-pg-migrate up -m migrations --envPath ../../.env",
         "migrate:down": "node-pg-migrate down -m migrations --envPath ../../.env",
         "migrate:create": "node-pg-migrate create -m migrations"
@@ -28,6 +29,7 @@
         "dotenv": "^18.0.5",
         "node-pg-migrate": "^9.0.0",
         "tsx": "^4.23.15",
-        "typescript": "^7.0.2"
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.3"
     }
 }

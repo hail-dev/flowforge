@@ -28,6 +28,7 @@ const actionConfigSchema = z.discriminatedUnion("kind", [
             maxAttempts: z.number().int().min(1).max(5).default(1),
             backoffMs: z.number().int().min(100).max(60_000).default(1000),
         }).default({ maxAttempts: 1, backoffMs: 1000}),
+        timeoutMs: z.number().int().min(100).max(30_000).default(10_000),
     }),
 ]);
 
