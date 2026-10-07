@@ -5,6 +5,7 @@
   import { authRouter } from "./auth/routes";
   import { requireAuth, AuthedRequest } from "./auth/middleware";
   import { workflowsRouter } from "./workflows/routes";
+  import { executeRouter } from "./workflows/executeRoute";
 
   const app = express();
   app.use(express.json());
@@ -15,6 +16,7 @@
   });
 
   app.use("/workflows", workflowsRouter);
+  app.use("/workflows", executeRouter);
 
   const port = Number(env.API_PORT ?? 3001);
 
