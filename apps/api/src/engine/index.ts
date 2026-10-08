@@ -31,7 +31,8 @@ function nextNodeId(def: WorkflowDefinition, fromId: string, branch?: "true" | "
 
 export async function runWorkflow(
     def: WorkflowDefinition,
-    triggerPayload: Record<string, unknown>
+    triggerPayload: Record<string, unknown>,
+    options: { signal?: AbortSignal } = {}
 ): Promise<ExecutionResult> {
     const trigger = def.nodes.find((n) => n.type === "trigger");
     if (!trigger) throw new Error("Engine error: no trigger node (should have been caught by validation)");
@@ -55,6 +56,19 @@ export async function runWorkflow(
         const node = findNode(def, currentId);
         const startedAt = new Date().toISOString();
 
+        if (options.signal?.aborted) {
+            steps.push({
+                nodeId: node.id,
+                type: node.type,
+                status: "failure",
+                startedAt,
+                endedAt: new Date().toISOString(),
+                error: "Execution timed out",
+            });
+            failed = true;
+            break;
+        }
+
         if (node.type === "condition") {
             const result = evaluateCondition(node.config, triggerPayload);
             steps.push({
@@ -71,7 +85,7 @@ export async function runWorkflow(
 
         if (node.type === "action") {
             if (node.config.kind === "http_request") {
-                const result = await executeHttpRequest(node.config, triggerPayload);
+                const result = await executeHttpRequest(node.config, triggerPayload, options.signal);
                 steps.push({
                     nodeId: node.id,
                     type: "action",

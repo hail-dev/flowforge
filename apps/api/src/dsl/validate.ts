@@ -89,5 +89,27 @@ export function validateGraphStructure(def: WorkflowDefinition): ValidationResul
         }
     }
 
+    // cycle detection (DFS): state 1 = in current path, 2 = fully explored
+    if (errors.length === 0) {
+        const adjacency = new Map<string, string[]>();
+        for (const e of def.edges) {
+            adjacency.set(e.source, [...(adjacency.get(e.source) ?? []), e.target]);
+        }
+        const state = new Map<string, 1 | 2>();
+        const hasCycle = (id: string): boolean => {
+            state.set(id, 1);
+            for (const next of adjacency.get(id) ?? []) {
+                const s = state.get(next);
+                if (s === 1) return true;
+                if (s === undefined && hasCycle(next)) return true;
+            }
+            state.set(id, 2);
+            return false;
+        };
+        if (def.nodes.some((n) => state.get(n.id) === undefined && hasCycle(n.id))) {
+            errors.push("Workflow graph must not contain cycles");
+        }
+    }
+
     return { valid: errors.length === 0, errors};
 }
