@@ -11,9 +11,10 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import FFNode from "./FFNode";
-import { toFlow, toDefinition, type FlowNode } from "./dsl";
-import { listWorkflows, getWorkflow, saveDefinition, ApiError, type WorkflowSummary } from "./api";
-import type { WorkflowDefinition } from "../../api/src/dsl/schema";
+import ConfigPanel from "./ConfigPanel";
+import { toFlow, toDefinition, defaultNode, nextId, type FlowNode } from "./dsl";
+import { listWorkflows, getWorkflow, saveDefinition, createWorkflow, ApiError, type WorkflowSummary } from "./api";
+import type { WorkflowDefinition, WorkflowNode } from "../../api/src/dsl/schema";
 
 const nodeTypes = { ff: FFNode };
 
@@ -22,6 +23,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Unexpected err
 export default function Canvas({ onLogout }: { onLogout: () => void }) {
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [status, setStatus] = useState("");
@@ -32,7 +34,7 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
       .then((list) => {
         setWorkflows(list);
         if (list.length > 0) setSelectedId(list[0].id);
-        else setStatus("No workflows yet. Create one with the API first.");
+        else setStatus("No workflows yet. Click New workflow.");
       })
       .catch((e) => setStatus(errMsg(e)));
   }, []);
@@ -41,6 +43,7 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
     if (!selectedId) return;
     let cancelled = false;
     setErrors([]);
+    setSelectedNodeId(null);
     setStatus("Loading...");
     getWorkflow(selectedId)
       .then((wf) => {
@@ -54,7 +57,7 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
         } else {
           setNodes([]);
           setEdges([]);
-          setStatus("This workflow has no valid definition yet");
+          setStatus("This workflow has no valid definition yet. Add a trigger.");
         }
       })
       .catch((e) => !cancelled && setStatus(errMsg(e)));
@@ -67,6 +70,44 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
     (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
     [setEdges]
   );
+
+  function addNode(type: WorkflowNode["type"]) {
+    setNodes((ns) => {
+      const id = nextId(type, ns);
+      return [
+        ...ns,
+        {
+          id,
+          type: "ff",
+          position: { x: 120 + ns.length * 30, y: 320 + ns.length * 20 },
+          deletable: type !== "trigger",
+          data: { dsl: defaultNode(type, id) },
+        },
+      ];
+    });
+  }
+
+  function updateNode(id: string, dsl: WorkflowNode) {
+    setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { dsl } } : n)));
+  }
+
+  function deleteNode(id: string) {
+    setNodes((ns) => ns.filter((n) => n.id !== id));
+    setEdges((es) => es.filter((e) => e.source !== id && e.target !== id));
+    setSelectedNodeId(null);
+  }
+
+  async function newWorkflow() {
+    const name = window.prompt("Workflow name?");
+    if (!name || !name.trim()) return;
+    try {
+      const wf = await createWorkflow(name.trim(), { nodes: [defaultNode("trigger", "trigger-1")], edges: [] });
+      setWorkflows((prev) => [{ id: wf.id, name: wf.name, is_active: wf.is_active }, ...prev]);
+      setSelectedId(wf.id);
+    } catch (e) {
+      setStatus(errMsg(e));
+    }
+  }
 
   async function save() {
     if (!selectedId) return;
@@ -82,6 +123,9 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+  const hasTrigger = nodes.some((n) => n.data.dsl.type === "trigger");
+
   return (
     <div style={{ width: "100vw", height: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", padding: 8, borderBottom: "1px solid #ddd" }}>
@@ -93,6 +137,18 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
             </option>
           ))}
         </select>
+        <button onClick={newWorkflow}>New workflow</button>
+        <span style={{ borderLeft: "1px solid #ddd", height: 20 }} />
+        <button onClick={() => addNode("trigger")} disabled={!selectedId || hasTrigger}>
+          + Trigger
+        </button>
+        <button onClick={() => addNode("condition")} disabled={!selectedId}>
+          + Condition
+        </button>
+        <button onClick={() => addNode("action")} disabled={!selectedId}>
+          + HTTP action
+        </button>
+        <span style={{ borderLeft: "1px solid #ddd", height: 20 }} />
         <button onClick={save} disabled={!selectedId}>
           Save
         </button>
@@ -108,19 +164,31 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
           ))}
         </ul>
       )}
-      <div style={{ flex: 1 }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          fitView
-        >
-          <Background />
-          <Controls />
-        </ReactFlow>
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        <div style={{ flex: 1 }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            onPaneClick={() => setSelectedNodeId(null)}
+            fitView
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
+        {selectedNode && (
+          <ConfigPanel
+            key={selectedNode.id}
+            node={selectedNode}
+            onChange={(dsl) => updateNode(selectedNode.id, dsl)}
+            onDelete={() => deleteNode(selectedNode.id)}
+          />
+        )}
       </div>
     </div>
   );

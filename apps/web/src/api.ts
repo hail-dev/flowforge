@@ -57,3 +57,5 @@ export const listWorkflows = () => request<WorkflowSummary[]>("/workflows");
 export const getWorkflow = (id: string) => request<WorkflowFull>(`/workflows/${id}`);
 export const saveDefinition = (id:string, definition: unknown) =>
     request<WorkflowFull>(`/workflows/${id}`, { method: "PUT", body: JSON.stringify({ definition }) });
+export const createWorkflow = (name: string, definition: unknown) =>
+  request<WorkflowFull>("/workflows", { method: "POST", body: JSON.stringify({ name, definition }) });

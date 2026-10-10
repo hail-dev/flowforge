@@ -9,6 +9,7 @@ export function toFlow(def: WorkflowDefinition): { nodes: FlowNode[]; edges: Edg
     id: n.id,
     type: "ff",
     position: n.position ?? { x: i * 260, y: 100 },
+    deletable: n.type !== "trigger",
     data: { dsl: n },
   }));
   const edges: Edge[] = def.edges.map((e, i) => ({
@@ -33,4 +34,31 @@ export function toDefinition(nodes: FlowNode[], edges: Edge[]): WorkflowDefiniti
                 : { source: e.source, target: e.target };
         }),
     };
+}
+
+export function nextId(prefix: string, existing: FlowNode[]): string {
+  let i = 1;
+  while (existing.some((n) => n.id === `${prefix}-${i}`)) i++;
+  return `${prefix}-${i}`;
+}
+
+export function defaultNode(type: WorkflowNode["type"], id: string): WorkflowNode {
+  switch (type) {
+    case "trigger":
+      return { id, type, config: { kind: "webhook" } };
+    case "condition":
+      return { id, type, config: { field: "amount", operator: "greater_than", value: 100 } };
+    case "action":
+      return {
+        id,
+        type,
+        config: {
+          kind: "http_request",
+          url: "https://httpbin.org/post",
+          method: "POST",
+          retry: { maxAttempts: 1, backoffMs: 1000 },
+          timeoutMs: 10000,
+        },
+      };
+  }
 }
