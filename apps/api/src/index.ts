@@ -1,54 +1,67 @@
-  import express from "express";
-  import { env } from "./env";
-  import { pool } from "./db";
-  import { redis } from "./redis";
-  import { authRouter } from "./auth/routes";
-  import { requireAuth, AuthedRequest } from "./auth/middleware";
-  import { workflowsRouter } from "./workflows/routes";
-  import { executeRouter } from "./workflows/executeRoute";
+import express from "express";
+import { env } from "./env";
+import { pool } from "./db";
+import { redis } from "./redis";
+import { authRouter } from "./auth/routes";
+import { requireAuth, AuthedRequest } from "./auth/middleware";
+import { workflowsRouter } from "./workflows/routes";
+import { executeRouter } from "./workflows/executeRoute";
+import { hooksRouter } from "./hooks/routes";
 
-  const app = express();
-  app.use(express.json());
+const app = express();
+app.use(express.json());
 
-  app.use("/auth", authRouter);
-  app.get("/auth/me", requireAuth, (req: AuthedRequest, res) => {
-    res.json({ auth: req.auth });
+app.use("/auth", authRouter);
+app.get("/auth/me", requireAuth, (req: AuthedRequest, res) => {
+  res.json({ auth: req.auth });
+});
+
+app.use("/workflows", workflowsRouter);
+app.use("/workflows", executeRouter);
+app.use("/hooks", hooksRouter);
+
+if (env.NODE_ENV !== "production") {
+  app.post("/dev/echo", (req, res) => {
+    res.json({ received: req.body, time: new Date().toISOString() });
   });
+}
 
-  app.use("/workflows", workflowsRouter);
-  app.use("/workflows", executeRouter);
+const port = Number(env.API_PORT ?? 3001);
 
-  const port = Number(env.API_PORT ?? 3001);
+app.use(express.json());
 
-  app.use(express.json());
-
-  async function check(fn: () => Promise<unknown>, timeoutMs = 2000): Promise<"ok" | "down"> {
-    try {
-      await Promise.race([
-        fn(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
-      ]);
-      return "ok";
-    } catch {
-      return "down";
-    }
-  }
-
-  app.get("/health", async (_req, res) => {
-    const [postgres, redisStatus] = await Promise.all([
-      check(() => pool.query("select 1")),
-      check(() => redis.ping()),
+async function check(
+  fn: () => Promise<unknown>,
+  timeoutMs = 2000,
+): Promise<"ok" | "down"> {
+  try {
+    await Promise.race([
+      fn(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), timeoutMs),
+      ),
     ]);
-    const healthy = postgres === "ok" && redisStatus === "ok";
+    return "ok";
+  } catch {
+    return "down";
+  }
+}
 
-    res.status(healthy ? 200 : 503).json({
-      status: healthy ? "ok" : "degraded",
-      service: "flowforge-api",
-      checks: { postgres, redis: redisStatus },
-      time: new Date().toISOString(),
-    });
-  });
+app.get("/health", async (_req, res) => {
+  const [postgres, redisStatus] = await Promise.all([
+    check(() => pool.query("select 1")),
+    check(() => redis.ping()),
+  ]);
+  const healthy = postgres === "ok" && redisStatus === "ok";
 
-  app.listen(port, () => {
-    console.log(`flowforge-api listening on http://localhost:${port}`);
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? "ok" : "degraded",
+    service: "flowforge-api",
+    checks: { postgres, redis: redisStatus },
+    time: new Date().toISOString(),
   });
+});
+
+app.listen(port, () => {
+  console.log(`flowforge-api listening on http://localhost:${port}`);
+});
