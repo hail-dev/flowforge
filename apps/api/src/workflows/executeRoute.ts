@@ -3,70 +3,98 @@ import { z } from "zod";
 import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
 import { executionQueue } from "../queue/executionQueue";
+import { enqueueExecution } from "../executions/enqueue";
 
 export const executeRouter = Router();
 executeRouter.use(requireAuth);
 
 const executeSchema = z.object({
-    payload: z.record(z.string(), z.any()).default({})
+  payload: z.record(z.string(), z.any()).default({}),
 });
 
 executeRouter.post("/:id/execute", async (req: AuthedRequest, res) => {
-    const parsed = executeSchema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.flatten() });
-    }
-    const tenantId = req.auth!.tenantId;
-    const workflowId = req.params.id;
+  const parsed = executeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+  const tenantId = req.auth!.tenantId;
+  const workflowId = req.params.id;
 
-    const workflowResult = await pool.query(
-        "SELECT id FROM workflows WHERE id = $1 AND tenant_id = $2",
-        [workflowId, tenantId]
-    );
-    if (workflowResult.rows.length === 0) {
-        return res.status(404).json({ error: "Workflow not found" });
-    }
+  if (typeof workflowId !== "string") {
+    return res.status(400).json({ error: "Invalid workflow ID" });
+  }
 
-    // const executionResult = await pool.query<{ id: string }>(
-    //     `INSERT INTO executions (tenant_id, workflow_id, status, trigger_payload)
-    //     VALUES ($1, $2, 'pending', $3)
-    //     RETURNING id`,
-    //     [tenantId, workflowId, parsed.data.payload]
-    // );
-    // const executionId = executionResult.rows[0].id;
+  const workflowResult = await pool.query(
+    "SELECT id FROM workflows WHERE id = $1 AND tenant_id = $2",
+    [workflowId, tenantId],
+  );
+  if (workflowResult.rows.length === 0) {
+    return res.status(404).json({ error: "Workflow not found" });
+  }
 
-    // await executionQueue.add("execute", { executionId }, { jobId: executionId});
+  // const executionResult = await pool.query<{ id: string }>(
+  //     `INSERT INTO executions (tenant_id, workflow_id, status, trigger_payload)
+  //     VALUES ($1, $2, 'pending', $3)
+  //     RETURNING id`,
+  //     [tenantId, workflowId, parsed.data.payload]
+  // );
+  // const executionId = executionResult.rows[0].id;
 
-    // res.status(202).json({ executionId, status: "pending" });
+  // await executionQueue.add("execute", { executionId }, { jobId: executionId});
 
-    const idempotencyKey = req.header("Idempotency-Key") ?? null;
-    if (idempotencyKey !== null && (idempotencyKey.length === 0 || idempotencyKey?.length > 200)) {
-        return res.status(400).json({ error: "Idempotency-Key must be 1-200 characters" });
-    }
+  // res.status(202).json({ executionId, status: "pending" });
 
-    const inserted = await pool.query<{ id: string }>(
-        `INSERT INTO executions (tenant_id, workflow_id, status, trigger_payload, idempotency_key)
-        VALUES ($1, $2, 'pending', $3, $4)
-        ON CONFLICT (workflow_id, idempotency_key) DO NOTHING
-        RETURNING id`,
-        [tenantId, workflowId, parsed.data.payload, idempotencyKey]
-    );
+  const idempotencyKey = req.header("Idempotency-Key") ?? null;
+  if (
+    idempotencyKey !== null &&
+    (idempotencyKey.length === 0 || idempotencyKey?.length > 200)
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Idempotency-Key must be 1-200 characters" });
+  }
 
-    if (inserted.rows.length === 0) {
-        const existing = await pool.query<{ id: string; status: string }>(
-            `SELECT id, status FROM executions
-            WHERE workflow_id = $1 AND idempotency_key = $2 AND tenant_id = $3`,
-            [workflowId, idempotencyKey, tenantId]
-        );
-        return res.status(200).json({
-            executionId: existing.rows[0].id,
-            status: existing.rows[0].status,
-            duplicate: true,
-        });
-    }
+  // const inserted = await pool.query<{ id: string }>(
+  //     `INSERT INTO executions (tenant_id, workflow_id, status, trigger_payload, idempotency_key)
+  //     VALUES ($1, $2, 'pending', $3, $4)
+  //     ON CONFLICT (workflow_id, idempotency_key) DO NOTHING
+  //     RETURNING id`,
+  //     [tenantId, workflowId, parsed.data.payload, idempotencyKey]
+  // );
 
-    const executionId = inserted.rows[0].id;
-    await executionQueue.add("execute", { executionId }, { jobId: executionId});
+  // if (inserted.rows.length === 0) {
+  //     const existing = await pool.query<{ id: string; status: string }>(
+  //         `SELECT id, status FROM executions
+  //         WHERE workflow_id = $1 AND idempotency_key = $2 AND tenant_id = $3`,
+  //         [workflowId, idempotencyKey, tenantId]
+  //     );
+  //     return res.status(200).json({
+  //         executionId: existing.rows[0].id,
+  //         status: existing.rows[0].status,
+  //         duplicate: true,
+  //     });
+  // }
 
-    res.status(202).json({ executionId, status: "pending" });
+  // const executionId = inserted.rows[0].id;
+  // await executionQueue.add("execute", { executionId }, { jobId: executionId});
+
+  // res.status(202).json({ executionId, status: "pending" });
+
+  const result = await enqueueExecution({
+    tenantId,
+    workflowId,
+    payload: parsed.data.payload,
+    idempotencyKey,
+  });
+
+  if (result.duplicate) {
+    return res
+      .status(200)
+      .json({
+        executionId: result.executionId,
+        status: result.status,
+        duplicate: true,
+      });
+  }
+  res.status(202).json({ executionId: result.executionId, status: "pending" });
 });

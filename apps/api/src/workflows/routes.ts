@@ -57,7 +57,7 @@ workflowsRouter.get("/", async (req: AuthedRequest, res) => {
 workflowsRouter.get("/:id", async (req: AuthedRequest, res) => {
     const tenantId = req.auth!.tenantId;
     const result = await pool.query(
-        `SELECT id, name, definition, is_active, created_at, updated_at
+        `SELECT id, name, definition, is_active, webhook_secret, created_at, updated_at
         FROM workflows WHERE id = $1 AND tenant_id = $2`,
         [req.params.id, tenantId]
     );
