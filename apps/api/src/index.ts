@@ -7,6 +7,7 @@ import { requireAuth, AuthedRequest } from "./auth/middleware";
 import { workflowsRouter } from "./workflows/routes";
 import { executeRouter } from "./workflows/executeRoute";
 import { hooksRouter } from "./hooks/routes";
+import { reconcileSchedules } from "./schedule/sync";
 
 const app = express();
 app.use(express.json());
@@ -65,3 +66,7 @@ app.get("/health", async (_req, res) => {
 app.listen(port, () => {
   console.log(`flowforge-api listening on http://localhost:${port}`);
 });
+
+reconcileSchedules()
+  .then((n) => console.log(`[schedule] reconciled, ${n} cron schedule(s) live`))
+  .catch((err) => console.error("[schedule] reconcile failed:", err));

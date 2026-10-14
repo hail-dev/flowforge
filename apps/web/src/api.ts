@@ -51,10 +51,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export type WorkflowSummary = { id: string; name: string; is_active: boolean};
-export type WorkflowFull = WorkflowSummary & { definition: unknown};
+export type WorkflowFull = WorkflowSummary & { definition: unknown; webhook_secret?: string };
 
 export const listWorkflows = () => request<WorkflowSummary[]>("/workflows");
 export const getWorkflow = (id: string) => request<WorkflowFull>(`/workflows/${id}`);
+export const setWorkflowActive = (id: string, isActive: boolean) =>
+  request<WorkflowFull>(`/workflows/${id}`, { method: "PUT", body: JSON.stringify({ isActive }) });
 export const saveDefinition = (id:string, definition: unknown) =>
     request<WorkflowFull>(`/workflows/${id}`, { method: "PUT", body: JSON.stringify({ definition }) });
 export const createWorkflow = (name: string, definition: unknown) =>

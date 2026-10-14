@@ -5,6 +5,9 @@ import { EXECUTION_QUEUE_NAME } from "../../api/src/queue/executionQueue";
 import { runWorkflow } from "../../api/src/engine";
 import { workflowDefinitionSchema } from "../../api/src/dsl/schema";
 import { validateWorkflowDefinition } from "../../api/src/dsl/validate";
+import { scheduleQueue, SCHEDULE_QUEUE_NAME } from "../../api/src/queue/scheduleQueue";
+import { enqueueExecution } from "../../api/src/executions/enqueue";
+import { getCronExpression } from "../../api/src/schedule/sync";
 
 interface ExecutionJobData {
   executionId: string;
@@ -105,6 +108,39 @@ worker.on("failed", async (job, err) => {
       console.error("[worker] could not mark execution failed:", dbErr);
     }
   }
+});
+
+async function processTick(job: Job<{ workflowId: string }>) {
+  const { workflowId } = job.data;
+
+  const found = await pool.query<{ id: string; tenant_id: string; is_active: boolean; definition: unknown }>(
+    "SELECT id, tenant_id, is_active, definition FROM workflows WHERE id = $1",
+    [workflowId]
+  );
+  const wf = found.rows[0];
+
+  if (!wf || !wf.is_active || !getCronExpression(wf.definition)) {
+    await scheduleQueue.removeJobScheduler(`wf:${workflowId}`);
+    console.log(`[schedule] removed stale scheduler for workflow ${workflowId}`);
+    return;
+  }
+
+  const result = await enqueueExecution({
+    tenantId: wf.tenant_id,
+    workflowId: wf.id,
+    payload: { trigger: "cron", firedAt: new Date().toISOString() },
+    idempotencyKey: `cron:${job.id}`,
+  });
+  console.log(`[schedule] workflow ${workflowId} fired -> execution ${result.executionId}`);
+}
+
+const scheduleWorker = new Worker(SCHEDULE_QUEUE_NAME, processTick, {
+  connection: { url: env.REDIS_URL },
+  concurrency: 5,
+});
+
+scheduleWorker.on("failed", (job, err) => {
+  console.error(`[schedule] tick ${job?.id} failed:`, err.message);
 });
 
 console.log("[worker] listening for execution jobs...");

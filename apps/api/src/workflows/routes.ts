@@ -4,6 +4,7 @@ import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
 import { create } from "node:domain";
 import { validateWorkflowDefinition } from "../dsl/validate";
+import { syncSchedule, removeSchedule } from "../schedule/sync";
 
 export const workflowsRouter = Router();
 workflowsRouter.use(requireAuth);
@@ -99,12 +100,26 @@ workflowsRouter.put("/:id", async (req: AuthedRequest, res) => {
     if (result.rows.length === 0) {
         return res.status(404).json({ error: "Workflow not found" });
     }
-    res.json(result.rows[0]);
+    
+    const row = result.rows[0];
+    try {
+      await syncSchedule(row);
+    } catch (err) {
+      console.error("schedule sync failed:", err);
+      return res.status(500).json({ error: "Workflow saved, but updating its schedule failed. Save again to retry." });
+    }
+    res.json(row);
 });
 
 // DELETE
 workflowsRouter.delete("/:id", async (req: AuthedRequest, res) => {
     const tenantId = req.auth!.tenantId;
+    const workflowId = req.params.id;
+
+    if (typeof workflowId !== "string") {
+        return res.status(400).json({ error: "Invalid workflow ID" });
+    }
+
     const result = await pool.query(
         `DELETE FROM workflows WHERE id = $1 AND tenant_id = $2 RETURNING id`,
         [req.params.id, tenantId]
@@ -112,5 +127,6 @@ workflowsRouter.delete("/:id", async (req: AuthedRequest, res) => {
     if (result.rows.length === 0) {
         return res.status(404).json({ error: " Workflow not found" });
     }
+    await removeSchedule(workflowId);
     res.status(204).send();
 });

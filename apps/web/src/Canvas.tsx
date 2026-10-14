@@ -15,6 +15,7 @@ import ConfigPanel from "./ConfigPanel";
 import { toFlow, toDefinition, defaultNode, nextId, type FlowNode } from "./dsl";
 import { listWorkflows, getWorkflow, saveDefinition, createWorkflow, ApiError, type WorkflowSummary } from "./api";
 import type { WorkflowDefinition, WorkflowNode } from "../../api/src/dsl/schema";
+import { setWorkflowActive } from "./api";
 
 const nodeTypes = { ff: FFNode };
 
@@ -28,6 +29,8 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [status, setStatus] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
+  const [active, setActive] = useState(false);
+  const [secret, setSecret] = useState<string | null>(null);
 
   useEffect(() => {
     listWorkflows()
@@ -48,6 +51,8 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
     getWorkflow(selectedId)
       .then((wf) => {
         if (cancelled) return;
+        setActive(wf.is_active);
+        setSecret(wf.webhook_secret ?? null);
         const def = wf.definition as Partial<WorkflowDefinition> | null;
         if (def && Array.isArray(def.nodes) && Array.isArray(def.edges)) {
           const flow = toFlow(def as WorkflowDefinition);
@@ -123,8 +128,24 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  async function toggleActive() {
+    if (!selectedId) return;
+    setErrors([]);
+    try {
+      const wf = await setWorkflowActive(selectedId, !active);
+      setActive(wf.is_active);
+      setWorkflows((prev) => prev.map((w) => (w.id === wf.id ? { ...w, is_active: wf.is_active } : w)));
+      setStatus(wf.is_active ? "Activated" : "Deactivated");
+    } catch (e) {
+      setStatus("Could not change active state");
+      setErrors([errMsg(e)]);
+    }
+  }
+
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
   const hasTrigger = nodes.some((n) => n.data.dsl.type === "trigger");
+  const triggerDsl = nodes.find((n) => n.data.dsl.type === "trigger")?.data.dsl;
+  const hookUrl = secret ? `${window.location.origin}/api/hooks/${secret}` : null;
 
   return (
     <div style={{ width: "100vw", height: "100vh", display: "flex", flexDirection: "column" }}>
@@ -152,6 +173,9 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
         <button onClick={save} disabled={!selectedId}>
           Save
         </button>
+        <button onClick={toggleActive} disabled={!selectedId}>
+          {active ? "Deactivate" : "Activate"}
+        </button>
         <span style={{ color: "#555" }}>{status}</span>
         <button onClick={onLogout} style={{ marginLeft: "auto" }}>
           Log out
@@ -163,6 +187,22 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
             <li key={i}>{m}</li>
           ))}
         </ul>
+      )}
+      {selectedId && (
+        <div style={{ padding: "4px 8px", fontSize: 12, borderBottom: "1px solid #ddd", background: active ? "#dcfce7" : "#f3f4f6" }}>
+          <strong>{active ? "ACTIVE" : "INACTIVE"}</strong>{" "}
+          {triggerDsl?.type === "trigger" && triggerDsl.config.kind === "cron" ? (
+            <span>Runs on cron "{triggerDsl.config.expression}" (UTC)</span>
+          ) : (
+            hookUrl && (
+              <span>
+                Webhook: <code>{hookUrl}</code>{" "}
+                <button onClick={() => navigator.clipboard.writeText(hookUrl)}>Copy</button>
+              </span>
+            )
+          )}
+          <span style={{ color: "#777" }}> (Activation uses the saved version. Save first if you changed the trigger.)</span>
+        </div>
       )}
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ flex: 1 }}>
