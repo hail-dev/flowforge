@@ -69,11 +69,11 @@ async function processJob(job: Job<ExecutionJobData>) {
         "UPDATE executions SET status = $2, error = $3, finished_at = now() WHERE id = $1",
         [executionId, result.status, result.steps.find((s) => s.status === "failure")?.error ?? null]
       );
-      for (const step of result.steps) {
+      for (const [index, step] of result.steps.entries()) {
         await client.query(
-          `INSERT INTO execution_steps (execution_id, node_id, node_type, status, output, error, started_at, ended_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [executionId, step.nodeId, step.type, step.status, step.output ?? null, step.error ?? null, step.startedAt, step.endedAt]
+          `INSERT INTO execution_steps (execution_id, step_index, node_id, node_type, status, output, error, started_at, ended_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [executionId, index, step.nodeId, step.type, step.status, step.output ?? null, step.error ?? null, step.startedAt, step.endedAt]
         );
       }
       await client.query("COMMIT");

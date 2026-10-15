@@ -8,6 +8,7 @@ import { workflowsRouter } from "./workflows/routes";
 import { executeRouter } from "./workflows/executeRoute";
 import { hooksRouter } from "./hooks/routes";
 import { reconcileSchedules } from "./schedule/sync";
+import { executionsRouter } from "./executions/routes";
 
 const app = express();
 app.use(express.json());
@@ -20,6 +21,7 @@ app.get("/auth/me", requireAuth, (req: AuthedRequest, res) => {
 app.use("/workflows", workflowsRouter);
 app.use("/workflows", executeRouter);
 app.use("/hooks", hooksRouter);
+app.use("/executions", executionsRouter);
 
 if (env.NODE_ENV !== "production") {
   app.post("/dev/echo", (req, res) => {
