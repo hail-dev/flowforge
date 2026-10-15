@@ -92,7 +92,7 @@ export async function runWorkflow(
                     status: result.success ? "success" : "failure",
                     startedAt,
                     endedAt: new Date().toISOString(),
-                    output: { statuscode: result.statusCode, responseBody: result.responseBody, attempts: result.attempts },
+                    output: { statusCode: result.statusCode, responseBody: result.responseBody, attempts: result.attempts },
                     error: result.error,
                 });
                 if (!result.success) {
