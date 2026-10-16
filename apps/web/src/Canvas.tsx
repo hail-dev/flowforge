@@ -21,7 +21,7 @@ const nodeTypes = { ff: FFNode };
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Unexpected error");
 
-export default function Canvas({ onLogout }: { onLogout: () => void }) {
+export default function Canvas({ onLogout, onShowHistory }: { onLogout: () => void; onShowHistory: () => void }) {
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -177,9 +177,10 @@ export default function Canvas({ onLogout }: { onLogout: () => void }) {
           {active ? "Deactivate" : "Activate"}
         </button>
         <span style={{ color: "#555" }}>{status}</span>
-        <button onClick={onLogout} style={{ marginLeft: "auto" }}>
-          Log out
+        <button onClick={onShowHistory} style={{ marginLeft: "auto" }}>
+          History
         </button>
+        <button onClick={onLogout}>Log out</button>
       </div>
       {errors.length > 0 && (
         <ul style={{ margin: 0, padding: "8px 24px", background: "#fee2e2", color: "#991b1b" }}>

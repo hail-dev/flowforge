@@ -61,3 +61,51 @@ export const saveDefinition = (id:string, definition: unknown) =>
     request<WorkflowFull>(`/workflows/${id}`, { method: "PUT", body: JSON.stringify({ definition }) });
 export const createWorkflow = (name: string, definition: unknown) =>
   request<WorkflowFull>("/workflows", { method: "POST", body: JSON.stringify({ name, definition }) });
+
+export type ExecutionStatus = "pending" | "running" | "success" | "failure";
+
+export type ExecutionSummary = {
+  id: string;
+  workflow_id: string;
+  workflow_name: string;
+  status: ExecutionStatus;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+};
+
+export type ExecutionStep = {
+  step_index: number | null;
+  node_id: string;
+  node_type: "trigger" | "condition" | "action";
+  status: "success" | "failure" | "skipped";
+  output: unknown;
+  error: string | null;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number | null;
+};
+
+export type ExecutionDetail = ExecutionSummary & {
+  trigger_payload: unknown;
+  idempotency_key: string | null;
+  steps: ExecutionStep[];
+};
+
+export type ExecutionFilters = {
+  workflowId?: string;
+  status?: ExecutionStatus;
+  limit: number;
+  offset: number;
+};
+
+export function listExecutions(f: ExecutionFilters) {
+  const q = new URLSearchParams({ limit: String(f.limit), offset: String(f.offset) });
+  if (f.workflowId) q.set("workflowId", f.workflowId);
+  if (f.status) q.set("status", f.status);
+  return request<{ items: ExecutionSummary[]; limit: number; offset: number }>(`/executions?${q.toString()}`);
+}
+
+export const getExecution = (id: string) => request<ExecutionDetail>(`/executions/${id}`);
