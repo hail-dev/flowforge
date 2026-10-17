@@ -37,7 +37,7 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
   const status = (err as { status?: number })?.status;
   const clientError = typeof status === "number" && status >= 400 && status < 500;
   if (clientError) {
-    apiLog.warn({ err, requestId: res.locals.requestId }, "request rejected");
+    apiLog.warn({ status, errType: (err as Error)?.name, requestId: res.locals.requestId }, "request rejected");
   } else {
     apiLog.error({ err, requestId: res.locals.requestId }, "unhandled error");
   }

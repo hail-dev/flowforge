@@ -9,6 +9,14 @@ export const logger: Logger = pino({
     base: { app: "flowforge" },
     timestamp: pino.stdTimeFunctions.isoTime,
     redact: ["authorization", "password", "headers.authorization", "req.headers.authorization"],
+    serializers: {
+    // body-parser attaches the raw request body to its errors; never log it
+    err: (e: unknown) => {
+      const s = pino.stdSerializers.err(e as Error) as unknown as Record<string, unknown>;
+      if (s && typeof s === "object") delete s.body;
+      return s;
+    },
+  },
 })
 
 export const apiLog = logger.child({ service: "api" });
