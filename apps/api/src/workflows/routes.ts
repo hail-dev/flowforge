@@ -5,6 +5,7 @@ import { requireAuth, AuthedRequest } from "../auth/middleware";
 import { create } from "node:domain";
 import { validateWorkflowDefinition } from "../dsl/validate";
 import { syncSchedule, removeSchedule } from "../schedule/sync";
+import { apiLog } from "../logger";
 
 export const workflowsRouter = Router();
 workflowsRouter.use(requireAuth);
@@ -105,7 +106,7 @@ workflowsRouter.put("/:id", async (req: AuthedRequest, res) => {
     try {
       await syncSchedule(row);
     } catch (err) {
-      console.error("schedule sync failed:", err);
+      apiLog.error({ err, workflowId: row.id, tenantId }, "schedule sync failed");
       return res.status(500).json({ error: "Workflow saved, but updating its schedule failed. Save again to retry." });
     }
     res.json(row);

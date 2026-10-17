@@ -1,5 +1,6 @@
 import { pool } from "../db";
 import { scheduleQueue } from "../queue/scheduleQueue";
+import { apiLog } from "../logger";
 
 export const schedulerIdFor = (workflowId: string) => `wf:${workflowId}`;
 
@@ -43,7 +44,7 @@ export async function reconcileSchedules(): Promise<number> {
       await syncSchedule(wf);
       if (getCronExpression(wf.definition)) scheduled++;
     } catch (err) {
-      console.error(`[schedule] could not sync workflow ${wf.id}:`, err);
+      apiLog.error({ err, workflowId: wf.id }, "could not sync schedule");
     }
   }
   return scheduled;

@@ -9,8 +9,12 @@ import { executeRouter } from "./workflows/executeRoute";
 import { hooksRouter } from "./hooks/routes";
 import { reconcileSchedules } from "./schedule/sync";
 import { executionsRouter } from "./executions/routes";
+import { apiLog, installCrashLogging } from "./logger";
+import { requestLogger } from "./requestLogger";
 
 const app = express();
+installCrashLogging(apiLog);
+app.use(requestLogger);
 app.use(express.json());
 
 app.use("/auth", authRouter);
@@ -28,6 +32,20 @@ if (env.NODE_ENV !== "production") {
     res.json({ received: req.body, time: new Date().toISOString() });
   });
 }
+
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const status = (err as { status?: number })?.status;
+  const clientError = typeof status === "number" && status >= 400 && status < 500;
+  if (clientError) {
+    apiLog.warn({ err, requestId: res.locals.requestId }, "request rejected");
+  } else {
+    apiLog.error({ err, requestId: res.locals.requestId }, "unhandled error");
+  }
+  if (res.headersSent) return next(err);
+  res.status(clientError ? status! : 500).json({
+    error: clientError ? "Invalid request body" : "Internal server error",
+  });
+});
 
 const port = Number(env.API_PORT ?? 3001);
 
@@ -66,9 +84,9 @@ app.get("/health", async (_req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`flowforge-api listening on http://localhost:${port}`);
+  apiLog.info({ port }, "api listening");
 });
 
 reconcileSchedules()
-  .then((n) => console.log(`[schedule] reconciled, ${n} cron schedule(s) live`))
-  .catch((err) => console.error("[schedule] reconcile failed:", err));
+  .then((n) => apiLog.info({ schedules: n }, "schedules reconciled"))
+  .catch((err) => apiLog.error({ err }, "schedule reconcile failed"))

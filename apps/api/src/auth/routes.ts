@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../db";
 import { hashPassword, verifyPassword } from "./password";
 import { signToken } from "./jwt";
+import { apiLog } from "../logger";
 
 export const authRouter = Router();
 
@@ -49,7 +50,7 @@ authRouter.post("/register", async (req, res) => {
             // unique_violation on users.email
             return res.status(409).json({ error: "Email already registered" });
         }
-        console.error("register error:", err);
+        apiLog.error({ err }, "register failed");
         res.status(500).json({ error: "Internal server error"});
     } finally {
         client.release();

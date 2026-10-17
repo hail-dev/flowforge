@@ -29,6 +29,14 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+export function describeFetchError(err: any): string {
+  const cause = err?.cause;
+  const code = cause?.code ?? cause?.errno;
+  if (code) return `${err.message} (${code})`;
+  if (cause?.message) return `${err.message} (${cause.message})`;
+  return err.message;
+}
+
 async function attemptOnce(
   config: HttpRequestConfig,
   payload: Record<string, unknown>,
@@ -66,7 +74,7 @@ async function attemptOnce(
       ? JOB_TIMEOUT_MESSAGE
       : err.name === "AbortError"
         ? `Timed out after ${config.timeoutMs}ms`
-        : err.message;
+        : describeFetchError(err);
     return { success: false, attempts: 1, error: message };
   } finally {
     clearTimeout(timeout);

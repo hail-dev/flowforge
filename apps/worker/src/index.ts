@@ -1,13 +1,16 @@
 import { Worker, Job } from "bullmq";
 import { pool } from "./db";
 import { env } from "./env";
+import { workerLog as log, installCrashLogging } from "../../api/src/logger";
 import { EXECUTION_QUEUE_NAME } from "../../api/src/queue/executionQueue";
-import { runWorkflow } from "../../api/src/engine";
-import { workflowDefinitionSchema } from "../../api/src/dsl/schema";
-import { validateWorkflowDefinition } from "../../api/src/dsl/validate";
 import { scheduleQueue, SCHEDULE_QUEUE_NAME } from "../../api/src/queue/scheduleQueue";
 import { enqueueExecution } from "../../api/src/executions/enqueue";
 import { getCronExpression } from "../../api/src/schedule/sync";
+import { runWorkflow } from "../../api/src/engine";
+import { workflowDefinitionSchema } from "../../api/src/dsl/schema";
+import { validateWorkflowDefinition } from "../../api/src/dsl/validate";
+
+installCrashLogging(log);
 
 interface ExecutionJobData {
   executionId: string;
@@ -22,23 +25,37 @@ async function markFailed(executionId: string, message: string) {
   );
 }
 
+const stepDuration = (startedAt: string, endedAt: string) =>
+  new Date(endedAt).getTime() - new Date(startedAt).getTime();
+
 async function processJob(job: Job<ExecutionJobData>) {
   const { executionId } = job.data;
 
-  // atomic claim: only one worker can move an execution from pending to running
-  const claim = await pool.query<{ workflow_id: string; trigger_payload: Record<string, unknown> }>(
+  // Atomic claim: only one worker can move an execution from pending to running
+  const claim = await pool.query<{
+    tenant_id: string;
+    workflow_id: string;
+    trigger_payload: Record<string, unknown>;
+    created_at: Date;
+  }>(
     `UPDATE executions SET status = 'running', started_at = now()
      WHERE id = $1 AND status = 'pending'
-     RETURNING workflow_id, trigger_payload`,
+     RETURNING tenant_id, workflow_id, trigger_payload, created_at`,
     [executionId]
   );
   const execution = claim.rows[0];
   if (!execution) {
-    console.log(`[worker] execution ${executionId} not claimable (missing or already handled), skipping`);
+    log.info({ executionId }, "execution not claimable (missing or already handled), skipping");
     return;
   }
 
-  console.log(`[worker] starting execution ${executionId}`);
+  const xlog = log.child({
+    executionId,
+    workflowId: execution.workflow_id,
+    tenantId: execution.tenant_id,
+  });
+  const startedAtMs = Date.now();
+  xlog.info({ queueWaitMs: startedAtMs - execution.created_at.getTime() }, "execution started");
 
   try {
     const workflowResult = await pool.query<{ definition: unknown }>(
@@ -48,12 +65,17 @@ async function processJob(job: Job<ExecutionJobData>) {
     const workflowRow = workflowResult.rows[0];
     if (!workflowRow) {
       await markFailed(executionId, "Workflow no longer exists");
+      xlog.warn({ status: "failure", durationMs: Date.now() - startedAtMs }, "workflow no longer exists");
       return;
     }
 
     const validation = validateWorkflowDefinition(workflowRow.definition);
     if (!validation.valid) {
       await markFailed(executionId, `Invalid workflow definition: ${validation.errors.join("; ")}`);
+      xlog.warn(
+        { status: "failure", errors: validation.errors, durationMs: Date.now() - startedAtMs },
+        "invalid workflow definition"
+      );
       return;
     }
     const definition = workflowDefinitionSchema.parse(workflowRow.definition);
@@ -84,10 +106,23 @@ async function processJob(job: Job<ExecutionJobData>) {
       client.release();
     }
 
-    console.log(`[worker] execution ${executionId} finished: ${result.status}`);
+    for (const step of result.steps) {
+      const fields = {
+        stepId: step.nodeId,
+        nodeType: step.type,
+        status: step.status,
+        durationMs: stepDuration(step.startedAt, step.endedAt),
+      };
+      if (step.status === "failure") xlog.warn({ ...fields, error: step.error }, "step finished");
+      else xlog.info(fields, "step finished");
+    }
+
+    const summary = { status: result.status, steps: result.steps.length, durationMs: Date.now() - startedAtMs };
+    if (result.status === "success") xlog.info(summary, "execution finished");
+    else xlog.warn(summary, "execution finished");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[worker] execution ${executionId} errored:`, message);
+    xlog.error({ err, durationMs: Date.now() - startedAtMs }, "execution errored");
     await markFailed(executionId, `Worker error: ${message}`);
   }
 }
@@ -98,14 +133,18 @@ const worker = new Worker<ExecutionJobData>(EXECUTION_QUEUE_NAME, processJob, {
   maxStalledCount: 0, // a job whose worker died is failed, not silently re-run
 });
 
+worker.on("error", (err) => {
+  log.error({ err }, "execution worker error");
+});
+
 worker.on("failed", async (job, err) => {
-  console.error(`[worker] job ${job?.id} failed:`, err.message);
   const executionId = job?.data?.executionId;
+  log.error({ jobId: job?.id, executionId, err }, "job failed");
   if (executionId) {
     try {
       await markFailed(executionId, `Job failed: ${err.message}`);
     } catch (dbErr) {
-      console.error("[worker] could not mark execution failed:", dbErr);
+      log.error({ err: dbErr, executionId }, "could not mark execution failed");
     }
   }
 });
@@ -121,7 +160,7 @@ async function processTick(job: Job<{ workflowId: string }>) {
 
   if (!wf || !wf.is_active || !getCronExpression(wf.definition)) {
     await scheduleQueue.removeJobScheduler(`wf:${workflowId}`);
-    console.log(`[schedule] removed stale scheduler for workflow ${workflowId}`);
+    log.info({ workflowId }, "removed stale scheduler");
     return;
   }
 
@@ -131,7 +170,10 @@ async function processTick(job: Job<{ workflowId: string }>) {
     payload: { trigger: "cron", firedAt: new Date().toISOString() },
     idempotencyKey: `cron:${job.id}`,
   });
-  console.log(`[schedule] workflow ${workflowId} fired -> execution ${result.executionId}`);
+  log.info(
+    { workflowId, tenantId: wf.tenant_id, executionId: result.executionId, duplicate: result.duplicate },
+    "schedule fired"
+  );
 }
 
 const scheduleWorker = new Worker(SCHEDULE_QUEUE_NAME, processTick, {
@@ -139,8 +181,12 @@ const scheduleWorker = new Worker(SCHEDULE_QUEUE_NAME, processTick, {
   concurrency: 5,
 });
 
-scheduleWorker.on("failed", (job, err) => {
-  console.error(`[schedule] tick ${job?.id} failed:`, err.message);
+scheduleWorker.on("error", (err) => {
+  log.error({ err }, "schedule worker error");
 });
 
-console.log("[worker] listening for execution jobs...");
+scheduleWorker.on("failed", (job, err) => {
+  log.error({ jobId: job?.id, err }, "schedule tick failed");
+});
+
+log.info({ executionTimeoutMs: env.EXECUTION_TIMEOUT_MS }, "worker listening for execution and schedule jobs");

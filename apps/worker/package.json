@@ -13,5 +13,8 @@
         "@types/pg": "^8.23.1",
         "tsx": "^4.23.15",
         "typescript": "^7.0.2"
+    },
+    "dependencies": {
+        "pino": "^10.4.0"
     }
 }
