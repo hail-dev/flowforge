@@ -82,6 +82,7 @@ async function processJob(job: Job<ExecutionJobData>) {
 
     const result = await runWorkflow(definition, execution.trigger_payload, {
       signal: AbortSignal.timeout(env.EXECUTION_TIMEOUT_MS),
+      allowPrivateNetworks: env.ALLOW_PRIVATE_NETWORKS,
     });
 
     const client = await pool.connect();
@@ -188,5 +189,9 @@ scheduleWorker.on("error", (err) => {
 scheduleWorker.on("failed", (job, err) => {
   log.error({ jobId: job?.id, err }, "schedule tick failed");
 });
+
+if (env.ALLOW_PRIVATE_NETWORKS) {
+  log.warn("private network access is ENABLED for HTTP actions (development only)");
+}
 
 log.info({ executionTimeoutMs: env.EXECUTION_TIMEOUT_MS }, "worker listening for execution and schedule jobs");

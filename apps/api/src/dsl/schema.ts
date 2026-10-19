@@ -20,7 +20,7 @@ const conditionConfigSchema = z.object({
 const actionConfigSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("http_request"),
-        url: z.url(),
+        url: z.url().refine((u) => /^https?:\/\//i.test(u), "URL must use http:// or https://"),
         method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
         headers: z.record(z.string(), z.any()).optional(),
         body: z.record(z.string(), z.any()).optional(),

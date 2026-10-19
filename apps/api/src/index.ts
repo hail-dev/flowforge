@@ -15,7 +15,14 @@ import { requestLogger } from "./requestLogger";
 const app = express();
 installCrashLogging(apiLog);
 app.use(requestLogger);
-app.use(express.json());
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+app.use(express.json({ limit: "100kb" }));
 
 app.use("/auth", authRouter);
 app.get("/auth/me", requireAuth, (req: AuthedRequest, res) => {
@@ -43,7 +50,7 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
   }
   if (res.headersSent) return next(err);
   res.status(clientError ? status! : 500).json({
-    error: clientError ? "Invalid request body" : "Internal server error",
+    error: status === 413 ? "Request body too large" : clientError ? "Invalid request body" : "Internal server error",
   });
 });
 
