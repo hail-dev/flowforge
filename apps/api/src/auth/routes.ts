@@ -4,6 +4,7 @@ import { pool } from "../db";
 import { hashPassword, verifyPassword } from "./password";
 import { signToken } from "./jwt";
 import { apiLog } from "../logger";
+import { loginLimiter, registerLimiter } from "../rateLimiters";
 
 export const authRouter = Router();
 
@@ -13,7 +14,7 @@ const registerSchema = z.object({
     password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-authRouter.post("/register", async (req, res) => {
+authRouter.post("/register", registerLimiter, async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
@@ -62,7 +63,7 @@ const loginSchema = z.object({
     password: z.string().min(1),
 });
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", loginLimiter, async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });

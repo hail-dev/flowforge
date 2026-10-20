@@ -13,6 +13,7 @@ import { apiLog, installCrashLogging } from "./logger";
 import { requestLogger } from "./requestLogger";
 
 const app = express();
+app.set("trust proxy", env.TRUST_PROXY_HOPS);
 installCrashLogging(apiLog);
 app.use(requestLogger);
 app.disable("x-powered-by");
@@ -91,7 +92,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.listen(port, () => {
-  apiLog.info({ port }, "api listening");
+  apiLog.info({ port, trustProxyHops: env.TRUST_PROXY_HOPS }, "api listening");
 });
 
 reconcileSchedules()

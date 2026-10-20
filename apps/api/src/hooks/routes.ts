@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { enqueueExecution } from "../executions/enqueue";
+import { hookIpLimiter, hookSecretLimiter } from "../rateLimiters";
 
 export const hooksRouter = Router();
 
 // Public: no requireAuth. The secret in the URL is the credential.
-hooksRouter.post("/:secret", async (req, res) => {
+hooksRouter.post("/:secret", hookIpLimiter, hookSecretLimiter, async (req, res) => {
   const { secret } = req.params;
-  if (!/^[a-f0-9]{48}$/.test(secret)) {
+  if (typeof secret !== "string" || !/^[a-f0-9]{48}$/.test(secret)) {
     return res.status(404).json({ error: "Not found" });
   }
 
