@@ -4,6 +4,7 @@ import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
 import { executionQueue } from "../queue/executionQueue";
 import { enqueueExecution } from "../executions/enqueue";
+import { executeLimiter } from "../rateLimiters";
 
 export const executeRouter = Router();
 executeRouter.use(requireAuth);
@@ -12,7 +13,7 @@ const executeSchema = z.object({
   payload: z.record(z.string(), z.any()).default({}),
 });
 
-executeRouter.post("/:id/execute", async (req: AuthedRequest, res) => {
+executeRouter.post("/:id/execute", executeLimiter, async (req: AuthedRequest, res) => {
   const parsed = executeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });

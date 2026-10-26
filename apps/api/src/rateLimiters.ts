@@ -1,6 +1,7 @@
 import type { Request } from "express";
 import { redis } from "./redis";
 import { rateLimit, type RateLimitStore } from "./rateLimit";
+import type { AuthedRequest } from "./auth/middleware";
 
 // One atomic step: count the hit, start the window on the first hit, and report the time left.
 const HIT_SCRIPT = `
@@ -57,5 +58,13 @@ export const hookSecretLimiter = rateLimit({
       ? secret
       : null;
   },
+  store: redisStore,
+});
+
+export const executeLimiter = rateLimit({
+  name: "execute",
+  limit: 60,
+  windowMs: 60_000,
+  key: (req) => (req as AuthedRequest).auth?.tenantId ?? null,
   store: redisStore,
 });

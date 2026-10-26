@@ -7,6 +7,7 @@ const envSchema = z.object({
     JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+      SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(1000).default(25000),
 });
 
 export type Env = z.infer<typeof envSchema>;

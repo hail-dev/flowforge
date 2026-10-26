@@ -11,6 +11,9 @@ import { reconcileSchedules } from "./schedule/sync";
 import { executionsRouter } from "./executions/routes";
 import { apiLog, installCrashLogging } from "./logger";
 import { requestLogger } from "./requestLogger";
+import { installGracefulShutdown } from "./shutdown";
+import { executionQueue } from "./queue/executionQueue";
+import { scheduleQueue } from "./queue/scheduleQueue";
 
 const app = express();
 app.set("trust proxy", env.TRUST_PROXY_HOPS);
@@ -38,6 +41,12 @@ app.use("/executions", executionsRouter);
 if (env.NODE_ENV !== "production") {
   app.post("/dev/echo", (req, res) => {
     res.json({ received: req.body, time: new Date().toISOString() });
+  });
+
+  app.post("/dev/delay/:ms", async (req, res) => {
+       const ms = Math.min(Math.max(Number(req.params.ms) || 0, 0), 30_000);
+       await new Promise((resolve) => setTimeout(resolve, ms));
+       res.json({ delayedMs: ms });
   });
 }
 
@@ -91,10 +100,28 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   apiLog.info({ port, trustProxyHops: env.TRUST_PROXY_HOPS }, "api listening");
 });
 
 reconcileSchedules()
   .then((n) => apiLog.info({ schedules: n }, "schedules reconciled"))
   .catch((err) => apiLog.error({ err }, "schedule reconcile failed"))
+
+installGracefulShutdown({
+     log: apiLog,
+     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+     steps: [
+       {
+         name: "http server",
+         run: () =>
+           new Promise<void>((resolve, reject) => {
+             server.close((err) => (err ? reject(err) : resolve()));
+             server.closeIdleConnections();
+           }),
+       },
+       { name: "queues", run: () => Promise.all([executionQueue.close(), scheduleQueue.close()]) },
+       { name: "redis", run: () => redis.quit() },
+       { name: "postgres", run: () => pool.end() },
+     ],
+   });

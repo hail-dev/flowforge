@@ -2,13 +2,16 @@ import { Worker, Job } from "bullmq";
 import { pool } from "./db";
 import { env } from "./env";
 import { workerLog as log, installCrashLogging } from "../../api/src/logger";
-import { EXECUTION_QUEUE_NAME } from "../../api/src/queue/executionQueue";
+import { EXECUTION_QUEUE_NAME, executionQueue } from "../../api/src/queue/executionQueue";
 import { scheduleQueue, SCHEDULE_QUEUE_NAME } from "../../api/src/queue/scheduleQueue";
 import { enqueueExecution } from "../../api/src/executions/enqueue";
 import { getCronExpression } from "../../api/src/schedule/sync";
 import { runWorkflow } from "../../api/src/engine";
 import { workflowDefinitionSchema } from "../../api/src/dsl/schema";
 import { validateWorkflowDefinition } from "../../api/src/dsl/validate";
+import { installGracefulShutdown } from "../../api/src/shutdown";
+import { pool as apiPool } from "../../api/src/db";
+import { sweepOnce } from "./sweeper";
 
 installCrashLogging(log);
 
@@ -27,6 +30,8 @@ async function markFailed(executionId: string, message: string) {
 
 const stepDuration = (startedAt: string, endedAt: string) =>
   new Date(endedAt).getTime() - new Date(startedAt).getTime();
+
+const inFlight = new Set<string>();
 
 async function processJob(job: Job<ExecutionJobData>) {
   const { executionId } = job.data;
@@ -48,6 +53,8 @@ async function processJob(job: Job<ExecutionJobData>) {
     log.info({ executionId }, "execution not claimable (missing or already handled), skipping");
     return;
   }
+
+  inFlight.add(executionId);
 
   const xlog = log.child({
     executionId,
@@ -125,6 +132,8 @@ async function processJob(job: Job<ExecutionJobData>) {
     const message = err instanceof Error ? err.message : String(err);
     xlog.error({ err, durationMs: Date.now() - startedAtMs }, "execution errored");
     await markFailed(executionId, `Worker error: ${message}`);
+  } finally {
+    inFlight.delete(executionId);
   }
 }
 
@@ -195,3 +204,37 @@ if (env.ALLOW_PRIVATE_NETWORKS) {
 }
 
 log.info({ executionTimeoutMs: env.EXECUTION_TIMEOUT_MS }, "worker listening for execution and schedule jobs");
+
+let sweeping = false;
+const sweepTimer = setInterval(async () => {
+  if (sweeping) return;
+  sweeping = true;
+  try {
+    const result = await sweepOnce({
+      pendingAfterMs: env.PENDING_SWEEP_AFTER_MS,
+      runningAfterMs: env.EXECUTION_TIMEOUT_MS + 60_000,
+    });
+    if (result.requeued > 0 || result.failedRunning > 0) log.info(result, "sweep finished");
+  } catch (err) {
+    log.error({ err }, "sweep failed");
+  } finally {
+    sweeping = false;
+  }
+}, env.SWEEP_INTERVAL_MS);
+
+installGracefulShutdown({
+  log,
+  timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+  steps: [
+    { name: "sweeper", run: async () => clearInterval(sweepTimer) },
+    // Stops taking new jobs and waits for the running ones to finish.
+    { name: "workers", run: () => Promise.all([worker.close(), scheduleWorker.close()]) },
+    { name: "queues", run: () => Promise.all([executionQueue.close(), scheduleQueue.close()]) },
+    { name: "postgres", run: () => Promise.all([pool.end(), apiPool.end()]) },
+  ],
+  onTimeout: async () => {
+    await Promise.all(
+      [...inFlight].map((id) => markFailed(id, "Worker shut down before the execution finished"))
+    );
+  },
+});

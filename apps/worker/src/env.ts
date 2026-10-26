@@ -11,6 +11,9 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
+    SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(1000).default(25000),
+    SWEEP_INTERVAL_MS: z.coerce.number().int().min(1000).default(60000),
+    PENDING_SWEEP_AFTER_MS: z.coerce.number().int().min(1000).default(120000),
   })
   .refine((e) => !(e.NODE_ENV === "production" && e.ALLOW_PRIVATE_NETWORKS), {
     message: "ALLOW_PRIVATE_NETWORKS must be false when NODE_ENV=production",
