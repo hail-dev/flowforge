@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
-import { apiLog } from "./logger";
+import { apiLog } from "@flowforge/core";
 import type { AuthedRequest } from "./auth/middleware";
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;

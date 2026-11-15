@@ -9,9 +9,8 @@ import { executeRouter } from "./workflows/executeRoute";
 import { hooksRouter } from "./hooks/routes";
 import { reconcileSchedules } from "./schedule/sync";
 import { executionsRouter } from "./executions/routes";
-import { apiLog, installCrashLogging } from "./logger";
+import { apiLog, installCrashLogging, installGracefulShutdown } from "@flowforge/core";
 import { requestLogger } from "./requestLogger";
-import { installGracefulShutdown } from "./shutdown";
 import { executionQueue } from "./queue/executionQueue";
 import { scheduleQueue } from "./queue/scheduleQueue";
 

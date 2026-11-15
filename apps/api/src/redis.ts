@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { apiLog } from "./logger";
+import { apiLog } from "@flowforge/core";
 
 export const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 

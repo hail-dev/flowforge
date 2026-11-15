@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { apiLog } from "./logger";
+import { apiLog } from "@flowforge/core";
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 

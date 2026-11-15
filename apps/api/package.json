@@ -11,7 +11,11 @@
         "migrate:up": "node-pg-migrate up -m migrations --envPath ../../.env",
         "migrate:down": "node-pg-migrate down -m migrations --envPath ../../.env",
         "migrate:create": "node-pg-migrate create -m migrations",
-        "dev:once": "tsx --env-file=../../.env src/index.ts"
+        "dev:once": "tsx --env-file=../../.env src/index.ts",
+        "predev": "tsc -p ../../packages/core/tsconfig.build.json",
+        "predev:once": "tsc -p ../../packages/core/tsconfig.build.json",
+        "pretypecheck": "tsc -p ../../packages/core/tsconfig.build.json",
+        "prebuild": "tsc -p ../../packages/core/tsconfig.build.json"
     },
     "dependencies": {
         "bcrypt": "^6.0.0",
@@ -23,7 +27,8 @@
         "pg": "^8.23.0",
         "pino": "^10.4.0",
         "undici": "^8.12.2",
-        "zod": "^4.6.5"
+        "zod": "^4.6.5",
+        "@flowforge/core": "*"
     },
     "devDependencies": {
         "@types/bcrypt": "^6.0.0",

@@ -1,6 +1,6 @@
+import { workerLog as log } from "@flowforge/core";
 import { pool } from "./db";
-import { workerLog as log } from "../../api/src/logger";
-import { executionQueue } from "../../api/src/queue/executionQueue";
+import { executionQueue } from "./queues";
 
 export interface SweepOptions {
   pendingAfterMs: number;

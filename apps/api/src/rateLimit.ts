@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
-import { apiLog } from "./logger";
+import { apiLog } from "@flowforge/core";
 
 export interface HitResult {
   count: number;

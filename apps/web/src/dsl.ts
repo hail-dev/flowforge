@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { WorkflowDefinition, WorkflowNode } from "../../api/src/dsl/schema";
+import type { WorkflowDefinition, WorkflowNode } from "@flowforge/core/dsl";
 
 export type FlowNodeData = { dsl: WorkflowNode };
 export type FlowNode = Node<FlowNodeData, "ff">;

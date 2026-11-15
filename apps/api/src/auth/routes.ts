@@ -3,7 +3,7 @@ import { z } from "zod";
 import { pool } from "../db";
 import { hashPassword, verifyPassword } from "./password";
 import { signToken } from "./jwt";
-import { apiLog } from "../logger";
+import { apiLog } from "@flowforge/core";
 import { loginLimiter, registerLimiter } from "../rateLimiters";
 
 export const authRouter = Router();

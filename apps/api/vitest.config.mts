@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
-// load the repo .env
+// Load the repo .env (if present) so the test database can be derived from DATABASE_URL.
 try {
   process.loadEnvFile("../../.env");
 } catch {
@@ -17,6 +18,15 @@ function testDatabaseUrl(): string {
 }
 
 export default defineConfig({
+  resolve: {
+    // Tests run against core's source, so they never see a stale dist.
+    alias: [
+      {
+        find: /^@flowforge\/core$/,
+        replacement: fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      },
+    ],
+  },
   test: {
     env: {
       DATABASE_URL: testDatabaseUrl(),

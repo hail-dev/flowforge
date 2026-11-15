@@ -1,16 +1,18 @@
 import { Worker, Job } from "bullmq";
+import {
+  workerLog as log,
+  installCrashLogging,
+  installGracefulShutdown,
+  runWorkflow,
+  workflowDefinitionSchema,
+  validateWorkflowDefinition,
+  getCronExpression,
+  EXECUTION_QUEUE_NAME,
+  SCHEDULE_QUEUE_NAME,
+} from "@flowforge/core";
 import { pool } from "./db";
 import { env } from "./env";
-import { workerLog as log, installCrashLogging } from "../../api/src/logger";
-import { EXECUTION_QUEUE_NAME, executionQueue } from "../../api/src/queue/executionQueue";
-import { scheduleQueue, SCHEDULE_QUEUE_NAME } from "../../api/src/queue/scheduleQueue";
-import { enqueueExecution } from "../../api/src/executions/enqueue";
-import { getCronExpression } from "../../api/src/schedule/sync";
-import { runWorkflow } from "../../api/src/engine";
-import { workflowDefinitionSchema } from "../../api/src/dsl/schema";
-import { validateWorkflowDefinition } from "../../api/src/dsl/validate";
-import { installGracefulShutdown } from "../../api/src/shutdown";
-import { pool as apiPool } from "../../api/src/db";
+import { executionQueue, scheduleQueue, enqueueExecution } from "./queues";
 import { sweepOnce } from "./sweeper";
 
 installCrashLogging(log);
@@ -230,7 +232,7 @@ installGracefulShutdown({
     // Stops taking new jobs and waits for the running ones to finish.
     { name: "workers", run: () => Promise.all([worker.close(), scheduleWorker.close()]) },
     { name: "queues", run: () => Promise.all([executionQueue.close(), scheduleQueue.close()]) },
-    { name: "postgres", run: () => Promise.all([pool.end(), apiPool.end()]) },
+    { name: "postgres", run: () => pool.end() },
   ],
   onTimeout: async () => {
     await Promise.all(

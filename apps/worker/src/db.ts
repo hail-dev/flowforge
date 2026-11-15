@@ -1,6 +1,6 @@
   import { Pool } from "pg";
   import { env } from "./env";
-  import { workerLog } from "../../api/src/logger";
+  import { workerLog } from "@flowforge/core";
 
   export const pool = new Pool({ connectionString: env.DATABASE_URL });
 

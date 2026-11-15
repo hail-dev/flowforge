@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { FlowNode } from "./dsl";
-import type { WorkflowNode } from "../../api/src/dsl/schema";
+import type { WorkflowNode } from "@flowforge/core/dsl";
 
 type TriggerNode = Extract<WorkflowNode, { type: "trigger" }>;
 type ConditionNode = Extract<WorkflowNode, { type: "condition" }>;

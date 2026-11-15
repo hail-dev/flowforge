@@ -14,7 +14,7 @@ import FFNode from "./FFNode";
 import ConfigPanel from "./ConfigPanel";
 import { toFlow, toDefinition, defaultNode, nextId, type FlowNode } from "./dsl";
 import { listWorkflows, getWorkflow, saveDefinition, createWorkflow, ApiError, type WorkflowSummary } from "./api";
-import type { WorkflowDefinition, WorkflowNode } from "../../api/src/dsl/schema";
+import type { WorkflowDefinition, WorkflowNode } from "@flowforge/core/dsl";
 import { setWorkflowActive } from "./api";
 
 const nodeTypes = { ff: FFNode };

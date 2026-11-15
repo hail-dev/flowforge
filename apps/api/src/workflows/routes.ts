@@ -3,9 +3,8 @@ import { z } from "zod";
 import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
 import { create } from "node:domain";
-import { validateWorkflowDefinition } from "../dsl/validate";
 import { syncSchedule, removeSchedule } from "../schedule/sync";
-import { apiLog } from "../logger";
+import { apiLog, validateWorkflowDefinition } from "@flowforge/core";
 
 export const workflowsRouter = Router();
 workflowsRouter.use(requireAuth);

@@ -6,3 +6,5 @@
 4. Architecture: modular monolith with a separate worker process.
 5. Local dev: Postgres + Redis in Docker Compose; apps run on the host with hot reload.
 6. TypeScript 6 uses `module`/`moduleResolution` = `NodeNext` (the legacy `Node` resolution was removed). Packages stay CommonJS (no `"type": "module"`).
+7. Shared code lives in packages/core (@flowforge/core): DSL, engine, logger, shutdown helper, queue factories, cron helpers, and enqueueExecution (dependencies passed in). Apps own their env, Postgres pool, and queue instances, so the worker no longer depends on API config.
+8. Core is compiled to dist (CommonJS) and rebuilt by predev/pretypecheck/prebuild hooks. API tests alias core to its source. The web app imports only the types from @flowforge/core/dsl.

@@ -1,12 +1,5 @@
-import { Queue } from "bullmq";
+import { createScheduleQueue, SCHEDULE_QUEUE_NAME } from "@flowforge/core";
 import { env } from "../env";
 
-export const SCHEDULE_QUEUE_NAME = "workflow-schedule";
-
-export const scheduleQueue = new Queue(SCHEDULE_QUEUE_NAME, {
-  connection: { url: env.REDIS_URL },
-  defaultJobOptions: {
-    removeOnComplete: { count: 50 },
-    removeOnFail: { count: 100 },
-  },
-});
+export { SCHEDULE_QUEUE_NAME };
+export const scheduleQueue = createScheduleQueue(env.REDIS_URL);

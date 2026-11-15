@@ -1,5 +1,10 @@
 {
     "name": "flowforge",
     "private": true,
-    "workspaces": ["apps/*", "packages/*"]
+    "workspaces": ["apps/*", "packages/*"],
+    "scripts": {
+        "build:core": "npm run build -w @flowforge/core",
+        "typecheck": "npm run typecheck --workspaces --if-present",
+        "test": "npm run test --workspaces --if-present"
+    }
 }
