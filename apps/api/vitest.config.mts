@@ -28,6 +28,7 @@ export default defineConfig({
     ],
   },
   test: {
+    exclude: ["**/node_modules/**", "**/dist/**"],
     env: {
       DATABASE_URL: testDatabaseUrl(),
       REDIS_URL: "redis://localhost:6379/15",

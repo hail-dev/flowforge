@@ -5,14 +5,30 @@
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "exports": {
-        ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-        "./dsl": { "types": "./dist/dsl/index.d.ts", "default": "./dist/dsl/index.js" }
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./dsl": {
+            "types": "./dist/dsl/index.d.ts",
+            "default": "./dist/dsl/index.js"
+        }
     },
-    "files": ["dist"],
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
         "dev": "tsc -p tsconfig.build.json --watch",
         "typecheck": "tsc --noEmit",
         "test": "vitest run"
+    },
+    "dependencies": {
+        "bullmq": "^6.7.6",
+        "cron-parser": "^5.10.4",
+        "pg": "^8.23.1",
+        "pino": "^10.4.0",
+        "undici": "^8.12.4",
+        "zod": "^4.6.7"
     }
 }
