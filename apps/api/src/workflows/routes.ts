@@ -2,7 +2,6 @@ import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
-import { create } from "node:domain";
 import { syncSchedule, removeSchedule } from "../schedule/sync";
 import { apiLog, validateWorkflowDefinition } from "@flowforge/core";
 

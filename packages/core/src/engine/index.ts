@@ -1,7 +1,6 @@
 import { WorkflowDefinition, WorkflowNode } from "../dsl/schema";
 import { evaluateCondition } from "./condition";
 import { executeHttpRequest } from "./actions/httpRequest";
-import { response } from "express";
 
 export interface StepResult {
   nodeId: string;
