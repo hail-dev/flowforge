@@ -24,6 +24,44 @@
         interval: 5s
         timeout: 3s
         retries: 10
+    
+    api:
+      profiles: ["app"]
+      image: flowforge-api:local
+      build:
+        context: .
+        dockerfile: apps/api/Dockerfile
+      environment:
+        NODE_ENV: development # local container test only; real deployments use production
+        DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+        REDIS_URL: redis://redis:6379
+        JWT_SECRET: ${JWT_SECRET}
+      ports:
+        - "3001:3001"
+      depends_on:
+        postgres:
+          condition: service_healthy
+        redis:
+          condition: service_healthy
+      stop_grace_period: 30s
+
+    worker:
+      profiles: ["app"]
+      image: flowforge-worker:local
+      build:
+        context: .
+        dockerfile: apps/worker/Dockerfile
+      environment:
+        NODE_ENV: development # local container test only
+        DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+        REDIS_URL: redis://redis:6379
+        ALLOW_PRIVATE_NETWORKS: "true" # lets actions reach http://api:3001; must be false in production
+      depends_on:
+        postgres:
+          condition: service_healthy
+        redis:
+          condition: service_healthy
+      stop_grace_period: 30s
 
   volumes:
     pgdata:
