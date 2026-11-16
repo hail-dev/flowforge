@@ -1,10 +1,18 @@
 {
     "name": "flowforge",
     "private": true,
-    "workspaces": ["apps/*", "packages/*"],
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
     "scripts": {
         "build:core": "npm run build -w @flowforge/core",
         "typecheck": "npm run typecheck --workspaces --if-present",
         "test": "npm run test --workspaces --if-present"
+    },
+    "allowScripts": {
+        "bcrypt@6.0.0": true,
+        "esbuild@0.28.2": true,
+        "msgpackr-extract@3.0.7": true
     }
 }
