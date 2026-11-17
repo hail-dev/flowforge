@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flowforge
+          POSTGRES_PASSWORD: flowforge_dev_password
+          POSTGRES_DB: flowforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flowforge -d flowforge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://flowforge:flowforge_dev_password@localhost:5432/flowforge_test
+      TEST_DATABASE_URL: postgresql://flowforge:flowforge_dev_password@localhost:5432/flowforge_test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply migrations to the test database
+        run: npm run migrate:ci -w @flowforge/api
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+      - name: Run all tests
+        run: npm test
+      - name: Build API and worker
+        run: |
+          npm run build -w @flowforge/api
+          npm run build -w @flowforge/worker
+      - name: Build web app
+        run: npm run build -w @flowforge/web
+
+  docker:
+    name: Build Docker images
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t flowforge-api:ci .
+      - name: Build worker image
+        run: docker build -f apps/worker/Dockerfile -t flowforge-worker:ci .
+      - name: Images refuse to start without configuration
+        run: |
+          for image in flowforge-api:ci flowforge-worker:ci; do
+            status=0
+            docker run --rm "$image" >/dev/null 2>&1 || status=$?
+            echo "$image exited with $status"
+            test "$status" -eq 1
+          done
+      - name: Images contain no .env file and no dev tools
+        run: |
+          for image in flowforge-api:ci flowforge-worker:ci; do
+            docker run --rm --entrypoint sh "$image" -c 'test ! -e /app/.env && test ! -d /app/node_modules/vitest && test ! -d /app/node_modules/typescript'
+          done
+
+  audit:
+    name: Dependency audit (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

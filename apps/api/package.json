@@ -11,6 +11,7 @@
         "migrate:up": "node-pg-migrate up -m migrations --envPath ../../.env",
         "migrate:down": "node-pg-migrate down -m migrations --envPath ../../.env",
         "migrate:create": "node-pg-migrate create -m migrations",
+        "migrate:ci": "node-pg-migrate up -m migrations",
         "dev:once": "tsx --env-file=../../.env src/index.ts",
         "predev": "tsc -p ../../packages/core/tsconfig.build.json",
         "predev:once": "tsc -p ../../packages/core/tsconfig.build.json",
