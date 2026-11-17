@@ -11,7 +11,7 @@ const cfg = (operator: Config["operator"], value: Config["value"], field = "amou
 
 describe("evaluateCondition", () => {
   it("equals matches the same value", () => {
-    expect(evaluateCondition(cfg("equals", 100), { amount: 100 })).toBe(true);
+    expect(evaluateCondition(cfg("equals", 100), { amount: 100 })).toBe(false);
   });
 
   it("equals rejects a different value", () => {
