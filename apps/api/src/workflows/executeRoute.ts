@@ -2,7 +2,6 @@ import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../db";
 import { requireAuth, AuthedRequest } from "../auth/middleware";
-import { executionQueue } from "../queue/executionQueue";
 import { enqueueExecution } from "../executions/enqueue";
 import { executeLimiter } from "../rateLimiters";
 
