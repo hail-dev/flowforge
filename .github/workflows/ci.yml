@@ -17,7 +17,7 @@ permissions:
 jobs:
   check:
     name: Typecheck, test, build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     services:
       postgres:
@@ -39,7 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Show runner image
-        run: echo "Runner image: $ImageOS $ImageVersion"
+        run: |
+          echo "Runner image: $ImageOS $ImageVersion"
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -62,7 +63,7 @@ jobs:
   docker:
     name: Build Docker images
     needs: check
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -86,7 +87,7 @@ jobs:
 
   audit:
     name: Dependency audit (informational)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     continue-on-error: true
     steps:
