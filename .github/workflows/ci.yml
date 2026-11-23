@@ -64,16 +64,18 @@ jobs:
     name: Build Docker images
     needs: check
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
       - name: Build API image
         run: docker build -f apps/api/Dockerfile -t flowforge-api:ci .
       - name: Build worker image
         run: docker build -f apps/worker/Dockerfile -t flowforge-worker:ci .
+      - name: Build combined image
+        run: docker build -f deploy/Dockerfile.combined -t flowforge-combined:ci .
       - name: Images refuse to start without configuration
         run: |
-          for image in flowforge-api:ci flowforge-worker:ci; do
+          for image in flowforge-api:ci flowforge-worker:ci flowforge-combined:ci; do
             status=0
             docker run --rm "$image" >/dev/null 2>&1 || status=$?
             echo "$image exited with $status"
@@ -81,7 +83,7 @@ jobs:
           done
       - name: Images contain no .env file and no dev tools
         run: |
-          for image in flowforge-api:ci flowforge-worker:ci; do
+          for image in flowforge-api:ci flowforge-worker:ci flowforge-combined:ci; do
             docker run --rm --entrypoint sh "$image" -c 'test ! -e /app/.env && test ! -d /app/node_modules/vitest && test ! -d /app/node_modules/typescript'
           done
 
