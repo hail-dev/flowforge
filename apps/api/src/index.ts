@@ -84,6 +84,10 @@ async function check(
   }
 }
 
+app.get("/livez", (_req, res) => {
+  res.json({ status: "alive" });
+});
+
 app.get("/health", async (_req, res) => {
   const [postgres, redisStatus] = await Promise.all([
     check(() => pool.query("select 1")),

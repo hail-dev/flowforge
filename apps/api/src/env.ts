@@ -12,4 +12,7 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-export const env: Env = envSchema.parse(process.env);
+export const env: Env = envSchema.parse({
+  ...process.env,
+  API_PORT: process.env.API_PORT ?? process.env.PORT,
+});
