@@ -25,7 +25,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     const auth = (req as AuthedRequest).auth;
     const level = path === "/health" || path === "/livez" ? "debug" : status >= 500 ? "error" : status >= 400 ? "warn" : "info";
     apiLog[level](
-      { requestId, method: req.method, path, status, durationMs, tenantId: auth?.tenantId, userId: auth?.userId },
+      { requestId, method: req.method, path, status, durationMs, ip: req.ip, tenantId: auth?.tenantId, userId: auth?.userId },
       "request completed"
     );
   });
